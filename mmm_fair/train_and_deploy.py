@@ -20,6 +20,7 @@ from sklearn.model_selection import train_test_split
 
 from .fairlearn_report import generate_reports_from_fairlearn
 
+
 # from mmm_fair.viz_trade_offs import plot3d
 
 default_data_setting = {
@@ -521,7 +522,29 @@ def train(args):
     # if args.classifier not in ["mmm_fair_gbt","mmm-fair-gbt","mmm_gbt", "mmm-gbt"]:
     mmm_classifier.update_theta(criteria="all")
 
-    return mmm_classifier, X_test, y_test, saIndex_test, sensitives
+
+    baseline_results = None
+    if hasattr(args, 'baseline_models') and args.baseline_models:
+        print(f"\nTraining {len(args.baseline_models)} baseline models...")
+        
+        # Rest of baseline training logic using args.baseline_models
+        if args.test is not None:
+            try:
+                split_frac = float(args.test)
+                baseline_results = train_baseline_models(
+                    args.baseline_models, X_train, y_train, X_test, y_test, saIndex_test, sensitives
+                )
+            except ValueError:
+                baseline_results = train_baseline_models(
+                    args.baseline_models, X, y, X_test, y_test, saIndex_test, sensitives
+                )
+        else:
+            baseline_results = train_baseline_models(
+                args.baseline_models, X, y, X, y, saIndex_test, sensitives
+            )
+
+
+    return mmm_classifier, X_test, y_test, saIndex_test, sensitives, baseline_results
 
     # 7. (Optional) FairBench reporting
 
@@ -635,6 +658,117 @@ def deploy(stype, mmm_classifier, X, clf_name, path):
         convert_to_pickle(mmm_classifier, path)
         print(f"Model saved in pickle format as '{path}.pkl'")
 
+
+
+
+def train_baseline_models(selected_models, X_train, y_train, X_test, y_test, saIndex_test, sensitives):
+    """
+    Train selected baseline models and return their results.
+    
+    Parameters:
+    -----------
+    selected_models : list
+        List of baseline model names to train
+    X_train, y_train : training data
+    X_test, y_test : test data  
+    saIndex_test : sensitive attribute indices for test data
+    sensitives : list of sensitive attribute names
+    
+    Returns:
+    --------
+    dict : Results for each baseline model
+    """
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.svm import SVC
+    from sklearn.naive_bayes import GaussianNB
+    from sklearn.neural_network import MLPClassifier  # Import MLP
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+    # Define available baseline models
+    baseline_model_map = {
+        'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+        'Gradient Boosting': GradientBoostingClassifier(n_estimators=100, random_state=42),
+        'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
+        'Decision Tree': DecisionTreeClassifier(max_depth=10, random_state=42),
+        'SVM': SVC(probability=True, random_state=42),
+        'Naive Bayes': GaussianNB(),
+        'MLP': MLPClassifier(hidden_layer_sizes=(100,), max_iter=300, random_state=42),  # Added MLP
+    }
+    
+    results = {}
+    
+    for model_name in selected_models:
+        if model_name in baseline_model_map:
+            print(f"Training baseline model: {model_name}")
+            
+            # Get the model
+            model = baseline_model_map[model_name]
+            
+            # Train the model
+            model.fit(X_train, y_train)
+            
+            # Make predictions
+            y_pred = model.predict(X_test)
+            
+            # Generate fairness report
+            # Create a mock classifier object with sensitives attribute for report generation
+            class MockClassifier:
+                def __init__(self, sensitives):
+                    self.sensitives = sensitives
+            
+            mock_clf = MockClassifier(sensitives)
+            
+            # Generate HTML report
+            report_html = generate_reports(
+                report_type="html",
+                sensitives=sensitives,
+                mmm_classifier=mock_clf,
+                saIndex_test=saIndex_test,
+                y_pred=y_pred,
+                y_test=y_test,
+                html=True,
+            )
+            
+            # Calculate basic metrics
+            
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred, average='weighted')
+            recall = recall_score(y_test, y_pred, average='weighted')
+            f1 = f1_score(y_test, y_pred, average='weighted')
+            
+            fairobs = []
+
+            for i in range(saIndex_test.shape[-1]):
+                sens = fb.categories(saIndex_test[:, i])
+                report = fb.reports.pairwise(
+                    predictions=y_pred,
+                    labels=y_test,
+                    sensitive=sens
+                )
+                report_dict = report.show(env=fb.export.ToDict)
+                
+                dp = report_dict['depends'][6]['depends'][1]['value']['value']
+                ep = report_dict['depends'][6]['depends'][2]['value']['value']
+                tpr = report_dict['depends'][6]['depends'][2]['value']['value']
+                fpr = report_dict['depends'][6]['depends'][3]['value']['value']
+                eo = max(tpr, fpr)
+                
+                fairobs.append([dp, ep, eo, tpr, fpr])
+                
+            results[model_name] = {
+                'model': model,
+                'predictions': y_pred,
+                'accuracy': accuracy,
+                'precision': precision,
+                'recall': recall,
+                'f1_score': f1,
+                'fairobs': fairobs,
+                'fairness_report': report_html,
+            }
+    
+    return results
 
 def main():
     parser = argparse.ArgumentParser(description="Train and Deploy MMM_Fair model")
@@ -752,7 +886,7 @@ def main():
     
     args = parser.parse_args()
 
-    mmm_classifier, X_test, y_test, saIndex_test, sensitives = train(args)
+    mmm_classifier, X_test, y_test, saIndex_test, sensitives, baseline_results = train(args)
     # y_pred = mmm_classifier.predict(X_test)
     plots = report_card(args, mmm_classifier, saIndex_test, sensitives, X_test, y_test)
     deploy(args.deploy, mmm_classifier, X_test, args.classifier, args.save_path)

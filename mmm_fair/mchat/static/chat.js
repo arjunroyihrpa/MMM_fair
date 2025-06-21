@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", function(){
                 // Check if this is a feature selector type of options
                 if (options.type === "features_selector") {
                     // Create and append the feature selector UI
-                    const featureSelector = createFeatureSelector(options.available, options.recommended);
+                    const featureSelector = createFeatureSelector(options.available, options.recommended, options.selector_title, options.item_label, options.arg_name);
                     messageDiv.appendChild(featureSelector);
                     // Scroll to the bottom after feature selector is added
                     scrollToBottom();
@@ -160,7 +160,7 @@ document.addEventListener("DOMContentLoaded", function(){
                     if (options.type === "features_selector") {
                         // Add a small delay before showing the feature selector
                         setTimeout(() => {
-                            const featureSelector = createFeatureSelector(options.available, options.recommended);
+                            const featureSelector = createFeatureSelector(options.available, options.recommended, options.selector_title, options.item_label, options.arg_name);
                             messageDiv.appendChild(featureSelector);
                             // Scroll to bottom after feature selector is added
                             scrollToBottom();
@@ -216,7 +216,7 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 
     // Create and display the feature selection UI
-    window.createFeatureSelector = function(availableFeatures, recommendedFeatures) {
+    window.createFeatureSelector = function(availableFeatures, recommendedFeatures, title, itemLabel, argName = 'prots') {
         // Clear any previous selection
         window.selectedFeatures = [];
         
@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", function(){
         
         // Create header with instructions
         const header = document.createElement('h4');
-        header.textContent = 'Select Protected Attributes';
+        header.textContent = `${title}`;
         selectorContainer.appendChild(header);
         
         // Create the recommended features section if available
@@ -268,7 +268,8 @@ document.addEventListener("DOMContentLoaded", function(){
             
             const allFeaturesLabel = document.createElement('div');
             allFeaturesLabel.classList.add('section-label');
-            allFeaturesLabel.textContent = 'All Available Features:';
+
+            allFeaturesLabel.textContent = `All Available ${itemLabel}:`;
             allFeaturesSection.appendChild(allFeaturesLabel);
             
             // Create dropdown for all features
@@ -279,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function(){
             // Add placeholder option
             const placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = '-- Select a feature --';
+            placeholder.textContent = `-- Select a ${itemLabel} --:`;
             placeholder.disabled = true;
             placeholder.selected = true;
             selectBox.appendChild(placeholder);
@@ -297,7 +298,7 @@ document.addEventListener("DOMContentLoaded", function(){
             // Add button to add selected feature
             const addButton = document.createElement('button');
             addButton.classList.add('add-feature-btn');
-            addButton.textContent = 'Add Feature';
+            addButton.textContent = `Add ${itemLabel}`;
             addButton.addEventListener('click', function() {
                 const selectedFeature = selectBox.value;
                 if (selectedFeature) {
@@ -333,10 +334,11 @@ document.addEventListener("DOMContentLoaded", function(){
         const submitBtn = document.createElement('button');
         submitBtn.classList.add('submit-features-btn');
         submitBtn.textContent = 'Submit Selection';
+
         submitBtn.addEventListener('click', function() {
-            submitFeatureSelection();
+            submitFeatureSelection(argName);
         });
-        
+
         selectorContainer.appendChild(submitBtn);
         
         // Ensure the container is fully visible
@@ -394,7 +396,10 @@ document.addEventListener("DOMContentLoaded", function(){
         fetch('/select_feature', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({feature: feature})
+            body: JSON.stringify({
+                feature: feature,
+                selector_type: selectorType
+            })
         })
         .then(response => response.json())
         .catch(error => console.error('Error selecting feature:', error));
@@ -417,18 +422,26 @@ document.addEventListener("DOMContentLoaded", function(){
     }
 
     // Function to submit feature selection
-    window.submitFeatureSelection = function() {
-        if (window.selectedFeatures.length === 0) {
+    window.submitFeatureSelection = function(selectorType = 'prots') {
+
+        console.log('DEBUG submitFeatureSelection called with selectorType:', selectorType);
+        console.log('DEBUG selectedFeatures:', window.selectedFeatures);
+        if (window.selectedFeatures.length === 0 && selectorType === 'prots') {
             alert('Please select at least one protected attribute.');
             return;
         }
         showLoading();
+        
+        const buttonValue = selectorType === 'baseline_models' ? 'submit_baseline_models' : 'submit_features';
+        
+        console.log('DEBUG buttonValue will be:', buttonValue);
+
         fetch('/ask_chat', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 message: '',
-                button_value: 'submit_features',
+                button_value: buttonValue,
                 selected_features: window.selectedFeatures
             })
         })
@@ -443,7 +456,7 @@ document.addEventListener("DOMContentLoaded", function(){
                     // Keep just the text part and remove the selector
                     const textContent = parentMessage.querySelector('.message-text');
                     if (textContent) {
-                        textContent.innerHTML = `Selected protected attributes: ${window.selectedFeatures.join(', ')}`;
+                        // textContent.innerHTML = `Selected protected attributes: ${window.selectedFeatures.join(', ')}`;
                         messageDiv.remove();
                     }
                 }

@@ -247,6 +247,7 @@ import plotly.express as px
 def plot_spider(
     objectives,
     theta=None,
+    baseline_results=None,
     criteria="all",
     axis_names=None,
     title="Multi-objective Line Chart",
@@ -284,6 +285,7 @@ def plot_spider(
                 y=obj_values,
                 mode="lines+markers",
                 name=str(theta[i]),
+                showlegend=False,
                 line=dict(color=color_map[i], width=2),
                 marker=dict(size=8, color=color_map[i]),
                 hovertemplate=(
@@ -304,6 +306,7 @@ def plot_spider(
         x=[None],
         y=[None],
         mode="markers",
+        showlegend=False,
         marker=dict(
             colorscale="Viridis",
             cmin=min_val,
@@ -315,6 +318,41 @@ def plot_spider(
         hoverinfo="none",
     )
     fig.add_trace(colorbar_trace)
+
+    if baseline_results:
+        baseline_colors = ['red', 'orange', 'purple', 'brown', 'pink', 'gray', 'cyan']
+        color_idx = 0
+        
+        for model_name, result in baseline_results.items():
+            if 'fairobs' in result:
+                # fairobs is a list of [dp, ep, eo, tpr, fpr] for each sensitive attribute
+                # Average across sensitive attributes or use first one
+                fairobs = result['fairobs']
+                if fairobs:  # Check if fairobs is not empty
+                    # Average across all sensitive attributes
+                    avg_fairobs = np.mean(fairobs, axis=0)  # [avg_dp, avg_ep, avg_eo, avg_tpr, avg_fpr]
+                    
+                    fig.add_trace(
+                        go.Scatter(
+                            x=axis_names,
+                            y=avg_fairobs,
+                            mode="lines+markers",
+                            name=model_name,
+                            legend="legend2",
+                            showlegend=True,  # Add this line explicitly
+                            line=dict(color=baseline_colors[color_idx % len(baseline_colors)], width=3, dash='dash'),
+                            marker=dict(size=10, color=baseline_colors[color_idx % len(baseline_colors)], symbol='square'),
+                            hovertemplate=(
+                                f"<b>{model_name}</b><br>"
+                                + "<br>".join([
+                                    f"{axis_names[j]}: {avg_fairobs[j]:.3f}"
+                                    for j in range(len(avg_fairobs))
+                                ])
+                                + f"<br>Sum: {sum(avg_fairobs):.3f}<extra></extra>"
+                            ),
+                        )
+                    )
+                    color_idx += 1
 
     # Wrapped title
     title_wrap = 100
@@ -351,7 +389,24 @@ def plot_spider(
         margin=dict(t=160),  # Adds space at the top for annotation + title
     )
 
-    fig.update_layout(showlegend=False)
+    if baseline_results:
+        fig.update_layout(
+            # showlegend=False,  # Hide the default legend since main traces don't use it
+            legend2=dict(
+                title=dict(text="Baseline Models"),
+                x=0.5,
+                xanchor="center",
+                y=-0.35,
+                yanchor="top",
+                orientation="h",
+                bgcolor="rgba(255,255,255,0.9)",
+                bordercolor="black",
+                borderwidth=1
+            ),
+            margin=dict(t=160, b=100)  # Add bottom margin for legend space
+        )
+    else:
+        fig.update_layout(showlegend=False)
 
     if html:
         return fig.to_html(full_html=True, include_plotlyjs=True)

@@ -78,6 +78,7 @@ CHAT_ARGS = [
     "classifier",
     "constraint",
     "n_learners",
+    "baseline_models",
     # "save_as",
     # "moo_vis"
 ]
@@ -99,6 +100,7 @@ default_args = {
     "test": 0.3,
     "early_stop": False,
     "moo_vis": True,
+    "baseline_models": [],
 }
 
 
@@ -215,6 +217,8 @@ NONPROTECTED_SUGGESTIONS = {
     },
     #"upload_data" : {},
 }
+
+BASELINE_MODEL_RECOMMENDATIONS = ["Decision Tree", "Random Forest", "MLP"]
 
 # Dictionary to store available features for each dataset
 DATASET_FEATURES = {}
@@ -387,6 +391,7 @@ def ask_chat():
         selected_features = request.form.get(
             "selected_features", []
         )
+
         nprotgs_value = request.form.get("nprotgs_value", "")
         button_value = request.form.get("button_value", "")
         if button_value:
@@ -399,6 +404,7 @@ def ask_chat():
             "selected_features", []
         )  # Get selected features if provided
     
+        selected_models = request.json.get('selected_models', [])  # Add this line
         # Add this to handle non-protected group selection
         nprotgs_value = request.json.get("nprotgs_value", "")
 
@@ -681,7 +687,7 @@ def ask_chat():
                 }
             )
         else:
-            user_args["prots"] = selected_features
+            user_args["prots"] = selected_features.copy()
             chat_history.append(
                 {
                     "sender": "bot",
@@ -715,6 +721,53 @@ def ask_chat():
             session["chat_history"] = chat_history
             session["user_args"] = user_args
             return jsonify({"chat_history": chat_history[-2:]})
+
+    # Handle baseline models selection submission
+    if user_msg == "submit_baseline_models" and selected_features:
+        # Process submitted baseline models
+        if not selected_features:
+            chat_history.append(
+                {
+                    "sender": "bot",
+                    "text": "No baseline models selected. Continuing without baseline comparison.",
+                }
+            )
+            user_args["baseline_models"] = []
+        else:
+            user_args["baseline_models"] = selected_features.copy()
+            chat_history.append(
+                {
+                    "sender": "bot",
+                    "text": f"Selected baseline models: {', '.join(selected_features)}",
+                }
+            )
+
+        # Continue to next parameter
+        new_missing = get_missing_args(user_args)
+        if new_missing:
+            next_arg = new_missing[0]
+            prompt, options = get_prompt_for_arg(next_arg, user_args)
+
+            message = {"sender": "bot", "text": prompt}
+            if options:
+                message["options"] = options
+
+            chat_history.append(message)
+        else:
+            chat_history.append(
+                {
+                    "sender": "bot",
+                    "text": "All arguments captured. What would you like to do?",
+                    "options": [
+                        {"value": "run", "text": "Run Training"},
+                        {"value": "reset", "text": "Start Over"},
+                    ],
+                }
+            )
+
+        session["chat_history"] = chat_history
+        session["user_args"] = user_args
+        return jsonify({"chat_history": chat_history[-2:]})
 
     if user_msg == "visualize_yes":
         # Store in user_args so we don't ask again
@@ -1277,6 +1330,24 @@ def validate_arg(arg_name, user_input, user_args):
         else:
             return True, False, ""
 
+    elif arg_name == "baseline_models":
+        if not user_input:
+            return True, [], ""  # Empty list is valid for baseline_models
+        else:
+            invalid_models = []
+            for model in user_input.split():
+                if model not in BASELINE_MODEL_RECOMMENDATIONS:
+                    invalid_models.append(model)
+            
+            if invalid_models:
+                return (
+                    False,
+                    None,
+                    f"Invalid baseline model(s): {', '.join(invalid_models)}. Available models: {', '.join(BASELINE_MODEL_RECOMMENDATIONS)}",
+                )
+            
+            return True, user_input.split(), ""
+
     else:
         return True, user_input, ""  # Default case
 
@@ -1423,6 +1494,8 @@ def get_prompt_for_arg(arg_name, user_args):
                 "type": "features_selector",
                 "available": available_features,
                 "recommended": recommended_features,
+                "selector_title": "Select Protected Attributes",
+                "item_label": "feature"
             },
         )
 
@@ -1533,27 +1606,47 @@ def get_prompt_for_arg(arg_name, user_args):
     
         return ("Enter the positive class label if known (else press Enter to skip):", None)
 
+    elif arg_name == "baseline_models":
+        return (
+            "Please select baseline models for comparison (optional):",
+            {
+                "type": "features_selector",
+                "available": BASELINE_MODEL_RECOMMENDATIONS,
+                "recommended": BASELINE_MODEL_RECOMMENDATIONS,
+                "selector_title": "Select Baseline Models",
+                "item_label": "model",
+                "arg_name": "baseline_models"
+            },
+        )
+
     return prompts.get(arg_name, (f"Enter {arg_name}:", None))
 
 
+# Add a new route to handle feature selection
 # Add a new route to handle feature selection
 @app.route("/select_feature", methods=["POST"])
 def select_feature():
     data = request.json
     feature = data.get("feature", "")
+    selector_type = data.get("selector_type", "prots")  # Default to prots for backward compatibility
 
     # Get current selected features
     user_args = session.get("user_args", {})
-    current_prots = user_args.get("prots", [])
+    
+    if selector_type == "baseline_models":
+        current_items = user_args.get("baseline_models", [])
+        key = "baseline_models"
+    else:
+        current_items = user_args.get("prots", [])
+        key = "prots"
 
     # Add the feature if not already selected
-    if feature and feature not in current_prots:
-        current_prots.append(feature)
-        user_args["prots"] = current_prots
+    if feature and feature not in current_items:
+        current_items.append(feature)
+        user_args[key] = current_items
         session["user_args"] = user_args
 
-    return jsonify({"success": True, "selected_features": current_prots})
-
+    return jsonify({"success": True, "selected_features": current_items})
 
 @app.route("/visualize_data", methods=["POST"])
 def visualize_data():
@@ -1670,7 +1763,58 @@ def visualize_data():
         )
 
 
-    
+@app.route("/finish_baseline_models", methods=["POST"])
+def finish_baseline_models():
+
+    print(f"DEBUG: Selected features finish_baseline_models called")
+
+    user_args = session.get("user_args", {})
+    selected_models = user_args.get("baseline_models", [])
+
+    chat_history = session.get("chat_history", [])
+
+    # Add message showing selected models
+    if selected_models:
+        chat_history.append(
+            {
+                "sender": "bot",
+                "text": f"Selected baseline models: {', '.join(selected_models)}",
+            }
+        )
+    else:
+        chat_history.append(
+            {
+                "sender": "bot",
+                "text": "No baseline models selected. Continuing without baseline comparison.",
+            }
+        )
+
+    # Continue to next parameter
+    new_missing = get_missing_args(user_args)
+    if new_missing:
+        next_arg = new_missing[0]
+        prompt, options = get_prompt_for_arg(next_arg, user_args)
+
+        message = {"sender": "bot", "text": prompt}
+        if options:
+            message["options"] = options
+
+        chat_history.append(message)
+    else:
+        chat_history.append(
+            {
+                "sender": "bot",
+                "text": "All arguments captured. What would you like to do?",
+                "options": [
+                    {"value": "run", "text": "Run Training"},
+                    {"value": "reset", "text": "Start Over"},
+                ],
+            }
+        )
+
+    session["chat_history"] = chat_history
+    return jsonify({"success": True, "chat_history": chat_history[-2:]})
+
 @app.route("/finish_features", methods=["POST"])
 def finish_features():
     user_args = session.get("user_args", {})
@@ -1686,6 +1830,9 @@ def finish_features():
 
     # Convert to the format expected by the existing code
     chat_history = session.get("chat_history", [])
+
+
+    print(f"DEBUG: Selected features finished_features called")
 
     # Add message showing selected features
     chat_history.append(
@@ -1760,12 +1907,29 @@ def reset_chat():
                 pass
     return "Chat reset done."
 
+def run_baselines(user_args):
+    """Train baseline models and return results"""
+    try:
+        selected_baselines = user_args.get("baseline_models", [])
+        results = {}
+        for model in selected_baselines:
+            # Implement training for each baseline model
+            # This is a placeholder - replace with actual implementation
+            results[model] = f"Trained {model} successfully"
+        
+        return results
+    except Exception as e:
+        print(f"Error training baselines: {str(e)}")
+        return {}
+
 
 def run_mmm_fair_app(user_args):
     data = session.get('data')
     user_args["df"]=data
     args = argparse.Namespace(**user_args)
-    mmm_classifier, X_test, y_test, saIndex_test, sensitives = train(args)
+    mmm_classifier, X_test, y_test, saIndex_test, sensitives, baseline_results = train(args)
+
+
     session["mmm_classifier"] = mmm_classifier
     session["xtest"] = X_test
     session["ytest"] = y_test
@@ -1773,7 +1937,7 @@ def run_mmm_fair_app(user_args):
     session["sensitives"] = sensitives
     PF = np.array([mmm_classifier.ob[i] for i in range(len(mmm_classifier.ob))])
     thetas = np.arange(len(mmm_classifier.ob))
-    title = f"3D Scatter Plot. Showing various trade-off points between Accuracy, Balanced Accuracy, and Maximum violation of {mmm_classifier.constraint} fairness among protected attributes."
+    title = f"2D Spider Plot. Showing various trade-off points between Accuracy, Balanced Accuracy, and Maximum violation of {mmm_classifier.constraint} fairness among protected attributes."
 
     vis_all = plot_spider(
         objectives=PF,
@@ -1796,10 +1960,11 @@ def run_mmm_fair_app(user_args):
     PF = np.array(
         [mmm_classifier.fairobs[i] for i in range(len(mmm_classifier.fairobs))]
     )
-    title = "3D Scatter Plot. Showing various trade-off points between maximum violation of Demopgraphic Parity, Equal Opportunity, and Equalized odds fairness for the given set of protected attributes."
+    title = "2D Spider Plot. Showing various trade-off points between maximum violation of Demopgraphic Parity, Equal Opportunity, and Equalized odds fairness for the given set of protected attributes."
     vis_fair = plot_spider(
         objectives=PF,
         theta=thetas,
+        baseline_results=baseline_results,
         criteria="Multi-definitions",
         axis_names=["DP", "EqOpp", "EqOdd", "TPR", "FPR"],
         title=title,
