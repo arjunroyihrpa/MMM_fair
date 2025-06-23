@@ -11,6 +11,13 @@ MMM-Fair is a fairness-aware machine learning framework designed to support high
 
 MMM-Fair enables developers, researchers, and decision-makers to explore the full spectrum of possible trade-offs and select the model configuration that aligns with their social or organizational goals.
 
+To Learn more about fairness-aware AI/ML please refer to the following materials:
+
+    1. Tutorial of Beginner's introduction to fair-ML: https://www.arjunroy.info/tutorials
+    2. Fair-ML Book: https://fairmlbook.org/pdf/fairmlbook.pdf
+
+---
+
 #### 💬 No coding required:
 MMM-Fair comes with an intuitive chat-based web UI (mmm-fair-chat) that guides users step by step—just like a human assistant would. You don’t need to write a single line of code. Simply upload your dataset (or use a built-in UCI dataset), select your fairness preferences, and explore trade-offs through automatically generated visual reports and summaries. 
 

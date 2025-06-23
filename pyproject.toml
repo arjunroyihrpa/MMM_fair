@@ -18,7 +18,7 @@ mmm-fair-chat = "mmm_fair.mchat.mmm_app:main"
 
 [project]
 name = "mmm-fair"
-version = "2.3.0"
+version = "2.4.0"
 description = "A multi-objective multi-fairness boosting classifier"
 readme = "README.md"
 authors = [

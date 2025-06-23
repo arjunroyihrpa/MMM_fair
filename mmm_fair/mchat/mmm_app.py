@@ -218,7 +218,7 @@ NONPROTECTED_SUGGESTIONS = {
     #"upload_data" : {},
 }
 
-BASELINE_MODEL_RECOMMENDATIONS = ["Decision Tree", "Random Forest", "MLP"]
+BASELINE_MODEL_RECOMMENDATIONS = ["Logistic Regression", "Decision Tree", "Random Forest", "MLP", "SVM", "Gradient Boosting", "Naive Bayes"]
 
 # Dictionary to store available features for each dataset
 DATASET_FEATURES = {}
