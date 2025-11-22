@@ -956,7 +956,7 @@ class MMM_Fair_GradientBoostedClassifier(HistGradientBoostingClassifier):
             check_is_fitted(self)
             for ypred in self.staged_predict(X_):
                 o1=1-accuracy_score(y_pred=ypred,y_true=y)
-                o2=1-balanced_accuracy_score(y_pred=ypred,y_true=y).item()
+                o2=1-balanced_accuracy_score(y_pred=ypred,y_true=y)#.item()
                 o3=[]
                 for i in range(self.saIndex.shape[-1]):
                     sens = fb.categories(self.saIndex[:, i])

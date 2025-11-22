@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: mmm-fair
-Version: 2.4.0
+Version: 2.4.1
 Summary: A multi-objective multi-fairness boosting classifier
 Author-email: Arjun Roy <arjunroyihrpa@gmail.com>, Swati Swati <swati17293@gmail.com>, Emmanouil Panagiotou <panagiotouemm@gmail.com>
 License:                                  Apache License
@@ -214,18 +214,21 @@ License-File: LICENSE
 Requires-Dist: numpy>=1.26.4
 Requires-Dist: six>=1.16.0
 Requires-Dist: pymoo>=0.6.1.3
-Requires-Dist: scikit-learn>=1.5.2
+Requires-Dist: scikit-learn==1.7.2
 Requires-Dist: ucimlrepo
 Requires-Dist: pandas>=2.2.3
 Requires-Dist: fairbench
 Requires-Dist: skl2onnx==1.17.0
 Requires-Dist: tqdm
 Requires-Dist: plotly
+Requires-Dist: onnx==1.17.0
 Requires-Dist: onnxruntime
 Requires-Dist: fairlearn
 Requires-Dist: rich
 Requires-Dist: Flask
 Requires-Dist: Flask-Session
+Requires-Dist: python-dotenv
+Requires-Dist: bs4
 Provides-Extra: llm-gpt
 Requires-Dist: openai; extra == "llm-gpt"
 Requires-Dist: langchain>=0.1.14; extra == "llm-gpt"
