@@ -2,6 +2,22 @@
 
 [![MMM-Fair Logo](https://raw.githubusercontent.com/arjunroyihrpa/MMM_fair/main/images/mmm-fair.png)](https://github.com/arjunroyihrpa/MMM_fair)
 
+# MMM-Fair
+[![MAI_BIAS toolkit](https://img.shields.io/badge/MAI_BIAS-⚖️_AI_fairness_tool-white)](https://mammoth-eu.github.io/mammoth-commons/index.html)
+
+This software is part of MAI-BIAS; a low-code toolkit for
+fairness analysis and mitigation, with an accompanying suite of coding
+tools. Our ecosystem operates in multidimensional and multi-attribute
+settings (safeguarding multiple races, genders, etc), and across multiple
+data modalities (like tabular data, images, text, graphs). Learn more
+[here](https://mammoth-eu.github.io/mammoth-commons/index.html).
+
+## 👥 Who is this for?
+
+- **ML engineers and data scientists** who need a Python library for training classifiers with built-in fairness constraints across multiple protected attributes simultaneously.
+- **Researchers** studying multi-objective fairness trade-offs under class imbalance, across definitions such as Demographic Parity, Equal Opportunity, and Equalized Odds.
+- **Non-technical users and domain experts** who want to explore fairness without writing code: use the chat-based web UI (`mmm-fair-chat`) to upload a dataset, set fairness preferences, and receive visual reports with plain-language explanations.
+- **Policymakers and auditors** evaluating an AI system: ask the responsible team whether a fairness constraint was applied during training and request a multi-objective trade-off report. MMM-Fair produces exactly this kind of evidence, showing how accuracy and fairness across demographic groups were balanced, without requiring any technical background to read the results.
 ## 🧠 What is MMM-Fair?
 
 MMM-Fair is a fairness-aware machine learning framework designed to support high-stakes AI decision-making under competing fairness and accuracy demands. The three M’s stand for:
